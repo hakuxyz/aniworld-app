@@ -12,7 +12,8 @@
     "@cliqz/adblocker-electron": "^1.2.5",
     "cross-fetch": "^4.0.0",
     "discord-rpc": "^4.0.1",
-    "electron-window-state": "^5.0.3"
+    "electron-window-state": "^5.0.3",
+    "mpris-service": "^2.1.2"
   },
   "devDependencies": {
     "electron": "^30.0.0",

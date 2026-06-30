@@ -3,6 +3,7 @@ const { ElectronBlocker } = require('@cliqz/adblocker-electron');
 const fetch = require('cross-fetch');
 const windowStateKeeper = require('electron-window-state');
 const DiscordRPC = require('discord-rpc');
+const MprisService = require('mpris-service');
 const fs = require('fs');
 const path = require('path');
 
@@ -13,6 +14,19 @@ app.commandLine.appendSwitch('enable-zero-copy');
 app.commandLine.appendSwitch('ignore-gpu-blocklist');
 
 const storagePath = path.join(app.getPath('userData'), 'session-resume.json');
+
+// MPRIS Setup für System-Mediensteuerung
+const mpris = new MprisService({
+  name: 'aniworld',
+  identity: 'AniWorld Client',
+  supportedInterfaces: ['player']
+});
+
+mpris.on('playpause', () => {
+  if (mainWindow) {
+    mainWindow.webContents.executeJavaScript("document.querySelector('video')?.paused ? document.querySelector('video')?.play() : document.querySelector('video')?.pause()");
+  }
+});
 
 function saveSession(url, title) {
   try {
@@ -52,7 +66,7 @@ const log = {
 
 let mainWindow;
 let splashWindow;
-let isInitialLoad = true; // Sperrt das Overlay nach dem ersten Start
+let isInitialLoad = true;
 const clientId = '1256942318465454152'; 
 let rpcConnected = false;
 let isPiPMode = false;
@@ -169,6 +183,8 @@ async function createWindow() {
     title: "AniWorld",
     autoHideMenuBar: true,
     show: false, 
+    frame: false, 
+    backgroundColor: '#0a0a0c',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -222,6 +238,14 @@ async function createWindow() {
   mainWindow.webContents.on('page-title-updated', (event, title) => {
     updateDiscordPresence(title);
     saveSession(mainWindow.webContents.getURL(), title);
+    
+    // Sync Navigation Button Status an das Preload Script
+    if (mainWindow) {
+      mainWindow.webContents.send('nav-state-sync', {
+        canGoBack: mainWindow.webContents.canGoBack(),
+        canGoForward: mainWindow.webContents.canGoForward()
+      });
+    }
   });
 
   mainWindow.webContents.on('did-finish-load', () => {
@@ -284,6 +308,19 @@ async function createWindow() {
     mainWindow = null;
   });
 }
+
+// IPC Kanäle für Rahmensteuerung und Navigation
+ipcMain.on('window-close-trigger', () => {
+  if (mainWindow) mainWindow.close(); 
+});
+
+ipcMain.on('nav-back-trigger', () => {
+  if (mainWindow && mainWindow.webContents.canGoBack()) mainWindow.webContents.goBack();
+});
+
+ipcMain.on('nav-forward-trigger', () => {
+  if (mainWindow && mainWindow.webContents.canGoForward()) mainWindow.webContents.goForward();
+});
 
 ipcMain.on('resume-action', (event, action, url, dontShowAgain) => {
   let data = loadStorage();
