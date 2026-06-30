@@ -19,3 +19,12 @@ You can compile and deploy the application locally via the command-line interfac
 ```bash
 git clone https://github.com/hakuxyz/aniworld-app.git
 cd aniworld-app
+
+### 2. Compilation from Source
+
+Follow these steps to compile the application binaries manually from the source code.
+
+### Prerequisites
+Ensure you have `nodejs` and `npm` installed on your system. On Arch:
+```bash
+sudo pacman -S nodejs npm
