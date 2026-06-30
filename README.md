@@ -17,5 +17,5 @@ You can compile and deploy the application locally via the command-line interfac
 
 ### 1. Clone the Repository
 ```bash
-git clone [https://github.com/hakuxyz/aniworld-app.git](https://github.com/hakuxyz/aniworld-app.git)
+git clone https://github.com/hakuxyz/aniworld-app.git
 cd aniworld-app
