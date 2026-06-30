@@ -1,0 +1,30 @@
+{
+  "name": "aniworld-app",
+  "version": "1.0.0",
+  "description": "AniWorld Linux App with uBlock Adblocker and Rich Features",
+  "main": "main.js",
+  "author": "x4d1",
+  "scripts": {
+    "start": "electron . --no-sandbox",
+    "dist": "electron-builder --linux"
+  },
+  "dependencies": {
+    "@cliqz/adblocker-electron": "^1.26.1",
+    "cross-fetch": "^4.0.0",
+    "discord-rpc": "^4.0.1",
+    "electron-window-state": "^5.0.3"
+  },
+  "devDependencies": {
+    "electron": "28.3.3",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.x4d1.aniworldapp",
+    "productName": "AniWorld",
+    "electronVersion": "28.3.3",
+    "linux": {
+      "target": ["AppImage", "dir"],
+      "category": "Video"
+    }
+  }
+}
