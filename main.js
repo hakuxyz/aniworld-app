@@ -1,20 +1,62 @@
-const { app, BrowserWindow, session, globalShortcut } = require('electron');
+const { app, BrowserWindow, session, ipcMain } = require('electron');
 const { ElectronBlocker } = require('@cliqz/adblocker-electron');
 const fetch = require('cross-fetch');
 const windowStateKeeper = require('electron-window-state');
 const DiscordRPC = require('discord-rpc');
+const fs = require('fs');
+const path = require('path');
+
+// Hardware-Beschleunigung für Linux
+app.commandLine.appendSwitch('enable-features', 'VaapiVideoDecoder,VaapiVideoEncoder,CanvasOopRasterization');
+app.commandLine.appendSwitch('enable-gpu-rasterization');
+app.commandLine.appendSwitch('enable-zero-copy');
+app.commandLine.appendSwitch('ignore-gpu-blocklist');
+
+const storagePath = path.join(app.getPath('userData'), 'session-resume.json');
+
+function saveSession(url, title) {
+  try {
+    let data = loadStorage();
+    if (data.dontShowAgain) return;
+    
+    if (url.includes('/anime/stream/') || url.includes('/stream/')) {
+      data.lastUrl = url;
+      data.lastTitle = title.replace(' | AniWorld.to', '').replace('AniWorld.to', '').trim();
+      fs.writeFileSync(storagePath, JSON.stringify(data));
+    }
+  } catch (e) {}
+}
+
+function loadStorage() {
+  try {
+    if (fs.existsSync(storagePath)) {
+      return JSON.parse(fs.readFileSync(storagePath, 'utf8'));
+    }
+  } catch (e) {}
+  return { lastUrl: null, lastTitle: null, dontShowAgain: false };
+}
 
 const log = {
-  info: (msg) => console.log(`\x1b[34m[INFO]\x1b[0m ${msg}`),
-  success: (msg) => console.log(`\x1b[32m[SUCCESS]\x1b[0m ${msg}`),
-  warn: (msg) => console.log(`\x1b[33m[WARN]\x1b[0m ${msg}`),
-  error: (msg) => console.log(`\x1b[31m[ERROR]\x1b[0m ${msg}`),
-  loader: (step, total, msg) => console.log(`\x1b[36m[LAUNCHER ${step}/${total}]\x1b[0m \x1b[5m...\x1b[0m ${msg}`)
+  send: (type, color, msg) => {
+    console.log(`${color}[${type}]\x1b[0m ${msg}`);
+    if (splashWindow && !splashWindow.isDestroyed()) {
+      splashWindow.webContents.send('log-to-console', type, color, msg);
+    }
+  },
+  info: (msg) => log.send('INFO', '\x1b[34m', msg),
+  success: (msg) => log.send('SUCCESS', '\x1b[32m', msg),
+  warn: (msg) => log.send('WARN', '\x1b[33m', msg),
+  error: (msg) => log.send('ERROR', '\x1b[31m', msg),
+  loader: (step, total, msg) => log.send(`LAUNCHER ${step}/${total}`, '\x1b[36m', msg)
 };
 
 let mainWindow;
+let splashWindow;
+let isInitialLoad = true; // Sperrt das Overlay nach dem ersten Start
 const clientId = '1256942318465454152'; 
 let rpcConnected = false;
+let isPiPMode = false;
+let prePiPBounds = {};
 
 DiscordRPC.register(clientId);
 const rpc = new DiscordRPC.Client({ transport: 'ipc' });
@@ -47,6 +89,71 @@ function updateDiscordPresence(title) {
   }).catch((err) => log.warn(`RPC Activity error: ${err.message}`));
 }
 
+function createSplashWindow() {
+  splashWindow = new BrowserWindow({
+    width: 650,
+    height: 400,
+    frame: false, 
+    alwaysOnTop: true,
+    resizable: false,
+    center: true,
+    backgroundColor: '#0a0a0c',
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false
+    }
+  });
+
+  const splashHTML = `
+    html, body {
+      background: #0a0a0c;
+      color: #d1d5db;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 13px;
+      margin: 0;
+      padding: 15px;
+      height: 100vh;
+      box-sizing: border-box;
+      overflow: hidden;
+    }
+    #console {
+      height: 100%;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+    .line { margin-bottom: 4px; }
+  `;
+
+  splashWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(`
+    <!DOCTYPE html>
+    <html>
+    <head><style>${splashHTML}</style></head>
+    <body>
+      <div id="console"></div>
+      <script>
+        const { ipcRenderer } = require('electron');
+        const consoleDiv = document.getElementById('console');
+        
+        function ansiToHtml(color, type, msg) {
+          let htmlColor = '#ffffff';
+          if (color.includes('[34m')) htmlColor = '#3b82f6';
+          if (color.includes('[32m')) htmlColor = '#10b981';
+          if (color.includes('[33m')) htmlColor = '#f59e0b';
+          if (color.includes('[31m')) htmlColor = '#ef4444';
+          if (color.includes('[36m')) htmlColor = '#06b6d4';
+          return '<div class="line"><span style="color:' + htmlColor + '; font-weight:bold;">[' + type + ']</span> ' + msg + '</div>';
+        }
+
+        ipcRenderer.on('log-to-console', (event, type, color, msg) => {
+          consoleDiv.innerHTML += ansiToHtml(color, type, msg);
+          consoleDiv.scrollTop = consoleDiv.scrollHeight;
+        });
+      </script>
+    </body>
+    </html>
+  `)}`);
+}
+
 async function createWindow() {
   log.loader(3, 5, 'Setting up window dimensions and state memory');
   let mainWindowState = windowStateKeeper({
@@ -61,10 +168,12 @@ async function createWindow() {
     height: mainWindowState.height,
     title: "AniWorld",
     autoHideMenuBar: true,
+    show: false, 
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: false
+      sandbox: false,
+      preload: path.join(__dirname, 'preload.js')
     }
   });
 
@@ -110,42 +219,88 @@ async function createWindow() {
   log.loader(5, 5, 'Establishing handshake with https://aniworld.to');
   mainWindow.loadURL('https://aniworld.to');
 
+  mainWindow.webContents.on('page-title-updated', (event, title) => {
+    updateDiscordPresence(title);
+    saveSession(mainWindow.webContents.getURL(), title);
+  });
+
   mainWindow.webContents.on('did-finish-load', () => {
     log.success('AniWorld execution complete. App fully running.');
-    updateDiscordPresence(mainWindow.getTitle());
+    
+    setTimeout(() => {
+      if (splashWindow) {
+        splashWindow.close();
+        splashWindow = null;
+      }
+      mainWindow.show();
+
+      if (isInitialLoad) {
+        const sessionData = loadStorage();
+        if (sessionData.lastUrl && !sessionData.dontShowAgain) {
+          mainWindow.webContents.send('show-resume-overlay', sessionData.lastTitle, sessionData.lastUrl);
+        }
+        isInitialLoad = false;
+      }
+    }, 300);
   });
 
-  mainWindow.on('page-title-updated', (event, title) => {
-    updateDiscordPresence(title);
-  });
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown') return;
 
-  mainWindow.on('focus', () => {
-    globalShortcut.register('Alt+Left', () => {
-      if (mainWindow && mainWindow.webContents.canGoBack()) {
+    if (input.alt && input.key.toLowerCase() === 'arrowleft') {
+      if (mainWindow.webContents.canGoBack()) {
         mainWindow.webContents.goBack();
         log.info('Shortcut trigger: Navigated back');
       }
-    });
-    globalShortcut.register('Alt+Right', () => {
-      if (mainWindow && mainWindow.webContents.canGoForward()) {
+    }
+    if (input.alt && input.key.toLowerCase() === 'arrowright') {
+      if (mainWindow.webContents.canGoForward()) {
         mainWindow.webContents.goForward();
         log.info('Shortcut trigger: Navigated forward');
       }
-    });
-  });
-
-  mainWindow.on('blur', () => {
-    globalShortcut.unregisterAll();
+    }
+    if (input.key.toLowerCase() === 'f11') {
+      const isFullScreen = mainWindow.isFullScreen();
+      mainWindow.setFullScreen(!isFullScreen);
+      log.info(`Window status: Fullscreen toggled to ${!isFullScreen}`);
+    }
+    if (input.alt && input.key.toLowerCase() === 'p') {
+      isPiPMode = !isPiPMode;
+      if (isPiPMode) {
+        prePiPBounds = mainWindow.getBounds();
+        mainWindow.setAlwaysOnTop(true, 'screen-saver');
+        mainWindow.setSize(410, 260);
+        log.info('PiP Mode activated (Always on Top)');
+      } else {
+        mainWindow.setAlwaysOnTop(false);
+        mainWindow.setBounds(prePiPBounds);
+        log.info('PiP Mode deactivated');
+      }
+    }
   });
 
   mainWindow.on('closed', () => {
     log.info('Closing session.');
-    globalShortcut.unregisterAll();
     mainWindow = null;
   });
 }
 
-// HIER IST DAS ERWEITERTE LOGGING FÜR DEN DISCORD HANDSHAKE
+ipcMain.on('resume-action', (event, action, url, dontShowAgain) => {
+  let data = loadStorage();
+  data.dontShowAgain = dontShowAgain;
+  
+  if (dontShowAgain || action === 'no') {
+    data.lastUrl = null;
+    data.lastTitle = null;
+  }
+  fs.writeFileSync(storagePath, JSON.stringify(data));
+
+  if (action === 'yes' && url) {
+    log.info(`Resuming last tracked session: ${url}`);
+    mainWindow.loadURL(url);
+  }
+});
+
 rpc.on('ready', () => {
   const userTag = rpc.user ? `${rpc.user.username}#${rpc.user.discriminator || '0000'}` : 'Unknown User';
   const userId = rpc.user ? rpc.user.id : 'Unknown ID';
@@ -163,14 +318,18 @@ app.whenReady().then(() => {
 ========================================
    ANIWORLD LINUX RUNTIME ENVIRONMENT   
 ========================================` + '\x1b[0m');
-  log.loader(1, 5, 'Booting Electron Core framework');
   
-  log.loader(2, 5, 'Connecting to local Discord IPC gateway');
-  rpc.login({ clientId }).catch((err) => {
-    log.warn(`Discord link skipped: Runtime running in standalone mode. Reason: ${err.message}`);
-  });
+  createSplashWindow();
 
-  createWindow();
+  setTimeout(() => {
+    log.loader(1, 5, 'Booting Electron Core framework');
+    log.loader(2, 5, 'Connecting to local Discord IPC gateway');
+    rpc.login({ clientId }).catch((err) => {
+      log.warn(`Discord link skipped: Runtime running in standalone mode. Reason: ${err.message}`);
+    });
+
+    createWindow();
+  }, 150);
 });
 
 app.on('window-all-closed', () => {

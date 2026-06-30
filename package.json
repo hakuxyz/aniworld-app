@@ -1,30 +1,21 @@
 {
   "name": "aniworld-app",
   "version": "1.0.0",
-  "description": "AniWorld Linux App with uBlock Adblocker and Rich Features",
+  "description": "Native AniWorld Streaming Client",
   "main": "main.js",
-  "author": "x4d1",
   "scripts": {
-    "start": "electron . --no-sandbox",
-    "dist": "electron-builder --linux"
+    "start": "electron .",
+    "dist": "electron-builder",
+    "deploy": "npm run dist && rm -rf /home/x4d1/.local/bin/aniworld-app && mkdir -p /home/x4d1/.local/bin/aniworld-app && cp -r dist/linux-unpacked/* /home/x4d1/.local/bin/aniworld-app/ && cp icon.png /home/x4d1/.local/bin/aniworld-app/icon.png && chmod +x /home/x4d1/.local/bin/aniworld-app/aniworld-app && chmod +x ~/.local/share/applications/aniworld.desktop && update-desktop-database ~/.local/share/applications/"
   },
   "dependencies": {
-    "@cliqz/adblocker-electron": "^1.26.1",
+    "@cliqz/adblocker-electron": "^1.2.5",
     "cross-fetch": "^4.0.0",
     "discord-rpc": "^4.0.1",
     "electron-window-state": "^5.0.3"
   },
   "devDependencies": {
-    "electron": "28.3.3",
+    "electron": "^30.0.0",
     "electron-builder": "^24.13.3"
-  },
-  "build": {
-    "appId": "com.x4d1.aniworldapp",
-    "productName": "AniWorld",
-    "electronVersion": "28.3.3",
-    "linux": {
-      "target": ["AppImage", "dir"],
-      "category": "Video"
-    }
   }
 }
