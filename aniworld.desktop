@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=AniWorld
+Exec=/home/x4d1/.local/bin/aniworld-app/aniworld-app
+Icon=/home/x4d1/.local/bin/aniworld-app/icon.png
+Type=Application
+Categories=Video;Utility;
+Terminal=false
