@@ -1,57 +1,92 @@
-### Aniworld Linux 1.0
+Here is the complete `README.md` enclosed entirely within a single code block so you can copy it with one click:
 
-A high-performance, native Linux desktop application for AniWorld.to, optimized for Arch Linux and CachyOS. Features an integrated uBlock Origin adblocking engine, Discord Rich Presence integration, custom media navigation controls, and an intelligent session-resume system.
+```markdown
+# AniWorld Linux Client
 
-## Key Features
+An optimized, feature-rich Electron client for AniWorld built specifically for Linux environments (Arch, CachyOS, Ubuntu, etc.). This client provides a native desktop experience with hardware acceleration, built-in ad-blocking, global shortcuts, and system-level integrations.
 
-* **Advanced Adblocker:** Implements native ElectronBlocker instances to terminate malicious redirects, inline frame exploits, and video player popups directly at the network layer.
-* **Terminal-Style Splashscreen:** A dedicated, frameless loading environment that provides real-time, color-coded logging during application startup.
-* **Session Resume System:** Automatically detects your last watched content and offers a seamless "Want to continue?" notification on launch with a 10-second auto-expiry progress bar.
-* **Discord RPC:** Automatic synchronization with local IPC sockets to display your current anime and episode status on your profile.
-* **Navigation & PiP:** Global shortcut bindings:
-    * `Alt + Left/Right`: Browser navigation.
-    * `Alt + P`: Toggle Picture-in-Picture mode (Always-on-Top).
-    * `F11`: True fullscreen.
+## Features
+
+* **Frameless UI & Custom Topbar:** Clean design with a borderless header containing integrated navigation (Back/Forward) and standard window management buttons.
+* **Discord Rich Presence (RPC):** Dynamically updates your Discord status with the anime you are currently watching and syncs your activities seamlessly.
+* **MPRIS Media Control:** Fully supports native Linux media daemons. Control your playback (Play/Pause) directly via system shortcuts, widgets, or keyboard media keys.
+* **Advanced Adblocker Engine:** Injected uBlock and EasyList filter arrays to safely terminate redirect targets, popups, and intrusive iframes.
+* **Session Resume Overlay:** Remembers your last watched anime episode and prompts you to continue where you left off when launching the client.
+* **Picture-in-Picture (PiP) Mode:** Hit `Alt + P` to toggle a floating, mini-player view that stays always on top.
+* **AniSkip Prototype:** Detects standard anime playback timelines and shows a dedicated "Skip Intro" button during the 30 to 90-second mark.
+* **Linux HW Acceleration:** Fine-tuned Chromium engine switches for optimal performance using Vaapi Video Decoders on Linux architectures.
+
+## Hotkeys
+
+| Shortcut | Action |
+| :--- | :--- |
+| `Alt + 🡨` | Navigate Back |
+| `Alt + 🡪` | Navigate Forward |
+| `Alt + P` | Toggle Picture-in-Picture Mode |
+| `F11` | Toggle Fullscreen |
 
 ---
 
-## Installation & Deployment
+## Prerequisites
 
-### 1. Prerequisites
-Ensure you have `nodejs` and `npm` installed.
+Ensure you have Node.js, npm, and the necessary system tools installed to compile native dependencies.
 
-On Arch/CachyOS:
+For Arch Linux / CachyOS:
 ```bash
-sudo pacman -S nodejs npm
+sudo pacman -S nodejs npm base-devel
 
 ```
 
-### 2. Clone & Setup
+---
+
+## Development & Deployment
+
+### 1. Installation of Dependencies
+
+Clone your repository, navigate to the folder, and install the backend modules:
 
 ```bash
-git clone [https://github.com/hakuxyz/aniworld-app.git](https://github.com/hakuxyz/aniworld-app.git)
-cd aniworld-app
 npm install
+npm install mpris-service
 
 ```
 
-### 3. Compilation & Deployment
+### 2. Build Executive Packets
 
-The app uses a dedicated deployment script defined in `package.json` to compile the source, clean up old binaries, and register the app in your system's application launcher.
-
-To build and deploy the app locally to your user directory:
+To compile the source files and package them into an independent AppImage and Snap release, run:
 
 ```bash
 npm run deploy
 
 ```
 
-*For future updates, simply run `npm run deploy` inside the project folder to refresh the installation.*
+The output binaries will be generated inside the `dist/` directory.
 
 ---
 
-## Contributing
+## System-Wide Installation
 
-The project is optimized for performance-heavy Linux environments. Feel free to submit pull requests for better filter lists or UI enhancements.
+You can use the provided automation scripts to cleanly install or remove the client from your local application desktop hierarchy.
+
+### Install the App:
+
+```bash
+chmod +x install.sh uninstall.sh
+sudo ./install.sh
+
+```
+
+This moves the AppImage to `/usr/local/share`, creates a global symlink in `/usr/local/bin`, downloads an application icon, and injects a `.desktop` entry so the app shows up in your system launcher menu.
+
+### Uninstall the App:
+
+```bash
+sudo ./uninstall.sh
+
+```
+
+This safely purges all installed binaries, tracking symlinks, and desktop entries from your Linux configuration.
+
+```
 
 ```
